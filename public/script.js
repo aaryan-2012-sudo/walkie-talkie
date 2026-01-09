@@ -23,8 +23,8 @@ function beep() {
 
 // join room
 joinBtn.onclick = () => {
-  username = document.getElementById("username").value;
-  room = document.getElementById("room").value;
+  username = document.getElementById("username").value.trim();
+  room = document.getElementById("room").value.trim();
 
   if (!username || !room) {
     alert("Enter name and room");
@@ -46,11 +46,13 @@ async function startTalk() {
   stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   recorder = new MediaRecorder(stream);
 
-  recorder.ondataavailable = (e) => {
-    socket.emit("audio", e.data);
+  recorder.ondataavailable = async (e) => {
+    // Convert Blob to ArrayBuffer before sending
+    const arrayBuffer = await e.data.arrayBuffer();
+    socket.emit("audio", arrayBuffer);
   };
 
-  recorder.start();
+  recorder.start(250); // send data every 250ms for smoother streaming
 }
 
 // stop talking
@@ -96,8 +98,10 @@ socket.on("system", (msg) => {
 });
 
 // play incoming audio
-socket.on("audio", ({ audio, username: speaker }) => {
-  const audioURL = URL.createObjectURL(audio);
-  const a = new Audio(audioURL);
-  a.play();
+socket.on("audio", (arrayBuffer) => {
+  // Rebuild Blob with correct MIME type
+  const audioBlob = new Blob([arrayBuffer], { type: 'audio/webm' });
+  const audioURL = URL.createObjectURL(audioBlob);
+  const audio = new Audio(audioURL);
+  audio.play().catch(err => console.log("Audio play error:", err));
 });
