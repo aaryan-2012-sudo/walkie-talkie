@@ -1,58 +1,83 @@
 const socket = io();
-let localStream;
-let peer;
 
-const button = document.getElementById("talk");
+const talkBtn = document.getElementById("talk");
+const joinBtn = document.getElementById("join");
+const status = document.getElementById("status");
 
-const config = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-};
+let recorder;
+let stream;
+let joined = false;
 
-async function init() {
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  peer = new RTCPeerConnection(config);
-
-  localStream.getTracks().forEach(track =>
-    peer.addTrack(track, localStream)
-  );
-
-  peer.onicecandidate = e => {
-    if (e.candidate) {
-      socket.emit("ice-candidate", e.candidate);
-    }
-  };
-
-  peer.ontrack = e => {
-    const audio = document.createElement("audio");
-    audio.srcObject = e.streams[0];
-    audio.autoplay = true;
-    document.body.appendChild(audio);
-  };
+// beep sound
+function beep() {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = 600;
+  osc.connect(ctx.destination);
+  osc.start();
+  setTimeout(() => osc.stop(), 120);
 }
 
-socket.on("offer", async offer => {
-  await peer.setRemoteDescription(offer);
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-  socket.emit("answer", answer);
-});
+// join room
+joinBtn.onclick = () => {
+  const username = document.getElementById("username").value;
+  const room = document.getElementById("room").value;
 
-socket.on("answer", answer => {
-  peer.setRemoteDescription(answer);
-});
+  if (!username || !room) {
+    alert("Enter name and room");
+    return;
+  }
 
-socket.on("ice-candidate", candidate => {
-  peer.addIceCandidate(candidate);
-});
-
-button.onmousedown = async () => {
-  if (!peer) await init();
-  localStream.getTracks().forEach(t => (t.enabled = true));
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  socket.emit("offer", offer);
+  socket.emit("join-room", { username, room });
+  joined = true;
+  status.innerText = `Joined room "${room}"`;
 };
 
-button.onmouseup = () => {
-  localStream.getTracks().forEach(t => (t.enabled = false));
-};
+// start talking
+async function startTalk() {
+  if (!joined) {
+    alert("Join a room first");
+    return;
+  }
+
+  beep();
+
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recorder = new MediaRecorder(stream);
+
+  recorder.ondataavailable = (e) => {
+    socket.emit("audio", e.data);
+  };
+
+  recorder.start();
+}
+
+// stop talking
+function stopTalk() {
+  if (!recorder) return;
+
+  recorder.stop();
+  stream.getTracks().forEach(t => t.stop());
+}
+
+// desktop
+talkBtn.onmousedown = startTalk;
+talkBtn.onmouseup = stopTalk;
+
+// mobile
+talkBtn.ontouchstart = startTalk;
+talkBtn.ontouchend = stopTalk;
+
+// play incoming audio
+socket.on("audio", ({ audio, username }) => {
+  status.innerText = `${username} is talking`;
+  const audioURL = URL.createObjectURL(audio);
+  const a = new Audio(audioURL);
+  a.play();
+});
+
+// system messages
+socket.on("system", (msg) => {
+  status.innerText = msg;
+});
