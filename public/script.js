@@ -2,13 +2,11 @@ const socket = io();
 
 const usersList = document.getElementById("users");
 const talkingStatus = document.getElementById("talkingStatus");
-
 const talkBtn = document.getElementById("talk");
 const joinBtn = document.getElementById("join");
 const status = document.getElementById("status");
 
-let recorder;
-let stream;
+let recorder, stream;
 let joined = false;
 let username, room;
 
@@ -40,22 +38,19 @@ joinBtn.onclick = () => {
 
 // start talking
 async function startTalk() {
-  if (!joined) {
-    alert("Join a room first");
-    return;
-  }
+  if (!joined) return alert("Join room first");
 
   beep();
+  socket.emit("start-talking");
 
   stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   recorder = new MediaRecorder(stream);
 
   recorder.ondataavailable = (e) => {
-    socket.emit("audio", { audio: e.data, username }); // send username too
+    socket.emit("audio", e.data);
   };
 
   recorder.start();
-  socket.emit("talking", { username, talking: true });
 }
 
 // stop talking
@@ -64,7 +59,7 @@ function stopTalk() {
 
   recorder.stop();
   stream.getTracks().forEach(t => t.stop());
-  socket.emit("talking", { username, talking: false });
+  socket.emit("stop-talking");
 }
 
 // desktop
@@ -75,12 +70,24 @@ talkBtn.onmouseup = stopTalk;
 talkBtn.ontouchstart = startTalk;
 talkBtn.ontouchend = stopTalk;
 
-// play incoming audio
-socket.on("audio", ({ audio, username: speaker }) => {
-  const audioURL = URL.createObjectURL(audio);
-  const a = new Audio(audioURL);
-  a.play();
-  talkingStatus.innerText = `${speaker} is talking 🎤`;
+// update users list
+socket.on("users", (users) => {
+  usersList.innerHTML = "";
+  users.forEach(user => {
+    const li = document.createElement("li");
+    li.textContent = user;
+    usersList.appendChild(li);
+  });
+});
+
+// show talking status
+socket.on("talking", (username) => {
+  talkingStatus.textContent = `🎤 ${username} is talking`;
+});
+
+// clear talking status
+socket.on("stopped", () => {
+  talkingStatus.textContent = "";
 });
 
 // system messages
@@ -88,12 +95,9 @@ socket.on("system", (msg) => {
   status.innerText = msg;
 });
 
-// update user list
-socket.on("users", (users) => {
-  usersList.innerHTML = "";
-  users.forEach(u => {
-    const li = document.createElement("li");
-    li.innerText = u;
-    usersList.appendChild(li);
-  });
+// play incoming audio
+socket.on("audio", ({ audio, username: speaker }) => {
+  const audioURL = URL.createObjectURL(audio);
+  const a = new Audio(audioURL);
+  a.play();
 });
