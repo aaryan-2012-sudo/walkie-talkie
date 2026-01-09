@@ -16,7 +16,9 @@ io.on("connection", socket => {
   socket.on("ice-candidate", candidate => socket.broadcast.emit("ice-candidate", candidate));
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on all interfaces on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
+
