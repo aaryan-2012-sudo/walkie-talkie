@@ -36,6 +36,22 @@
       font-size: 14px;
       opacity: 0.8;
     }
+
+    #users {
+      list-style: none;
+      padding: 0;
+      margin-top: 10px;
+    }
+
+    #users li {
+      margin: 4px 0;
+    }
+
+    #talkingStatus {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #0f0;
+    }
   </style>
 </head>
 
@@ -52,6 +68,13 @@
   <button id="talk">🎤 Hold to Talk</button>
 
   <div id="status"></div>
+
+  <!-- People in room -->
+  <h3>👥 People in room</h3>
+  <ul id="users"></ul>
+
+  <!-- Who is talking -->
+  <h3 id="talkingStatus"></h3>
 
   <script src="script.js"></script>
 </body>
