@@ -1,44 +1,40 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.static("public"));
+const rooms = {};
 
 io.on("connection", (socket) => {
-  console.log("User connected");
-
   socket.on("join-room", ({ username, room }) => {
     socket.username = username;
     socket.room = room;
+
     socket.join(room);
 
-    socket.to(room).emit("system", `${username} joined the room`);
+    if (!rooms[room]) rooms[room] = [];
+    rooms[room].push(username);
+
+    io.to(room).emit("users", rooms[room]);
+    socket.to(room).emit("system", `${username} joined`);
   });
 
-  socket.on("audio", (audioBlob) => {
-    if (!socket.room) return;
+  socket.on("start-talking", () => {
+    socket.to(socket.room).emit("talking", socket.username);
+  });
 
+  socket.on("stop-talking", () => {
+    socket.to(socket.room).emit("stopped", socket.username);
+  });
+
+  socket.on("audio", (audio) => {
     socket.to(socket.room).emit("audio", {
-      audio: audioBlob,
+      audio,
       username: socket.username
     });
   });
 
   socket.on("disconnect", () => {
-    if (socket.username && socket.room) {
-      socket.to(socket.room).emit(
-        "system",
-        `${socket.username} left the room`
-      );
-    }
-  });
-});
+    const room = socket.room;
+    if (!room || !rooms[room]) return;
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port", PORT);
+    rooms[room] = rooms[room].filter(u => u !== socket.username);
+    io.to(room).emit("users", rooms[room]);
+    socket.to(room).emit("system", `${socket.username} left`);
+  });
 });
