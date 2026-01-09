@@ -1,5 +1,8 @@
 const socket = io();
 
+const usersList = document.getElementById("users");
+const talkingStatus = document.getElementById("talkingStatus");
+
 const talkBtn = document.getElementById("talk");
 const joinBtn = document.getElementById("join");
 const status = document.getElementById("status");
