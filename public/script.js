@@ -10,6 +10,7 @@ const status = document.getElementById("status");
 let recorder;
 let stream;
 let joined = false;
+let username, room;
 
 // beep sound
 function beep() {
@@ -24,8 +25,8 @@ function beep() {
 
 // join room
 joinBtn.onclick = () => {
-  const username = document.getElementById("username").value;
-  const room = document.getElementById("room").value;
+  username = document.getElementById("username").value;
+  room = document.getElementById("room").value;
 
   if (!username || !room) {
     alert("Enter name and room");
@@ -50,10 +51,11 @@ async function startTalk() {
   recorder = new MediaRecorder(stream);
 
   recorder.ondataavailable = (e) => {
-    socket.emit("audio", e.data);
+    socket.emit("audio", { audio: e.data, username }); // send username too
   };
 
   recorder.start();
+  socket.emit("talking", { username, talking: true });
 }
 
 // stop talking
@@ -62,6 +64,7 @@ function stopTalk() {
 
   recorder.stop();
   stream.getTracks().forEach(t => t.stop());
+  socket.emit("talking", { username, talking: false });
 }
 
 // desktop
@@ -73,14 +76,24 @@ talkBtn.ontouchstart = startTalk;
 talkBtn.ontouchend = stopTalk;
 
 // play incoming audio
-socket.on("audio", ({ audio, username }) => {
-  status.innerText = `${username} is talking`;
+socket.on("audio", ({ audio, username: speaker }) => {
   const audioURL = URL.createObjectURL(audio);
   const a = new Audio(audioURL);
   a.play();
+  talkingStatus.innerText = `${speaker} is talking 🎤`;
 });
 
 // system messages
 socket.on("system", (msg) => {
   status.innerText = msg;
+});
+
+// update user list
+socket.on("users", (users) => {
+  usersList.innerHTML = "";
+  users.forEach(u => {
+    const li = document.createElement("li");
+    li.innerText = u;
+    usersList.appendChild(li);
+  });
 });
